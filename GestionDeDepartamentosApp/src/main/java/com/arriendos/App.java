@@ -6,272 +6,283 @@ import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.stage.Stage;
 
 import java.math.BigDecimal;
+import java.text.NumberFormat;
 import java.time.LocalDate;
-import java.time.YearMonth;
-import java.util.*;
+import java.util.List;
+import java.util.Locale;
 
 public class App extends Application {
 
-    // Servicio en memoria (luego se puede cambiar por SQL/JPA)
     private final ArriendoService service = new ArriendoService();
-
-    // Componentes de UI
     private ComboBox<Sucursal> comboSucursal;
     private GridPane gridDeptos;
-    private Label lblTitulo;
     private VBox panelDetalle;
-
-    // Estado actual
     private Sucursal sucursalActual;
     private Departamento dptoSeleccionado;
+
+    private final NumberFormat formatoMoneda = NumberFormat.getCurrencyInstance(new Locale("es", "EC"));
 
     @Override
     public void start(Stage stage) {
         stage.setTitle("Gestión de Arriendos");
 
         BorderPane root = new BorderPane();
-        root.setPadding(new Insets(12));
+        root.setPadding(new Insets(20));
+        root.setStyle("-fx-background-color:linear-gradient(to bottom right,#F3E5F5,#EDE7F6,#D1C4E9);"
+                + "-fx-font-family:'Segoe UI';");
 
-        // ---------- TOP ----------
-        HBox topBar = new HBox(10);
-        topBar.setAlignment(Pos.CENTER_LEFT);
+        Label lblTitulo = new Label("Gestión de Arriendos");
+        lblTitulo.setFont(Font.font("Segoe UI Semibold", 26));
+        lblTitulo.setTextFill(Color.web("#4A148C"));
+
         comboSucursal = new ComboBox<>();
         comboSucursal.getItems().addAll(service.listarSucursales());
+        comboSucursal.setStyle(
+                "-fx-background-color:white;" +
+                "-fx-border-radius:10;" +
+                "-fx-background-radius:10;" +
+                "-fx-padding:6 12;" +
+                "-fx-font-size:14px;" +
+                "-fx-border-color:#B39DDB;" +
+                "-fx-text-fill:#4A148C;"
+        );
+        comboSucursal.setPrefWidth(220);
         comboSucursal.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> {
             if (newV != null) {
                 sucursalActual = newV;
                 construirGrid();
-                lblTitulo.setText("Sucursal: " + newV.getNombre());
                 panelDetalle.getChildren().setAll(crearPanelPlaceholder());
                 dptoSeleccionado = null;
             }
         });
 
-        Button btnRefrescar = new Button("Refrescar");
-        btnRefrescar.setOnAction(e -> construirGrid());
+        HBox topBar = new HBox(15, new Label("Sucursal:"), comboSucursal);
+        topBar.setAlignment(Pos.CENTER_LEFT);
+        topBar.setPadding(new Insets(15));
+        topBar.setStyle("-fx-background-color:#F8F6FF;-fx-background-radius:15;"
+                + "-fx-effect:dropshadow(gaussian,rgba(0,0,0,0.1),8,0,0,2);");
 
-        lblTitulo = new Label("Gestión de Arriendos");
-        lblTitulo.setFont(Font.font(18));
+        VBox top = new VBox(10, lblTitulo, topBar);
+        top.setAlignment(Pos.CENTER_LEFT);
+        root.setTop(top);
 
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-
-        topBar.getChildren().addAll(new Label("Sucursal:"), comboSucursal, btnRefrescar, spacer, lblTitulo);
-        root.setTop(topBar);
-
-        // ---------- CENTRO ----------
         gridDeptos = new GridPane();
-        gridDeptos.setHgap(10);
-        gridDeptos.setVgap(10);
-        gridDeptos.setPadding(new Insets(10));
+        gridDeptos.setHgap(16);
+        gridDeptos.setVgap(16);
+        gridDeptos.setPadding(new Insets(20));
         ScrollPane scroll = new ScrollPane(gridDeptos);
         scroll.setFitToWidth(true);
+        scroll.setStyle("-fx-background:transparent;-fx-background-color:transparent;");
         root.setCenter(scroll);
 
-        // ---------- DERECHA ----------
-        panelDetalle = new VBox(10);
-        panelDetalle.setPadding(new Insets(10));
+        panelDetalle = new VBox(15);
+        panelDetalle.setPadding(new Insets(25));
+        panelDetalle.setStyle("-fx-background-color:rgba(255,255,255,0.92);"
+                + "-fx-background-radius:15;-fx-effect:dropshadow(gaussian,rgba(0,0,0,0.1),10,0,0,4);");
         panelDetalle.getChildren().add(crearPanelPlaceholder());
-        panelDetalle.setPrefWidth(360);
         root.setRight(panelDetalle);
 
-        Scene scene = new Scene(root, 1100, 650);
+        Scene scene = new Scene(root, 1200, 720);
         stage.setScene(scene);
         stage.show();
 
-        if (!comboSucursal.getItems().isEmpty())
-            comboSucursal.getSelectionModel().selectFirst();
+        if (!comboSucursal.getItems().isEmpty()) comboSucursal.getSelectionModel().selectFirst();
     }
 
     private VBox crearPanelPlaceholder() {
-        VBox box = new VBox(6);
-        box.getChildren().add(new Label("Selecciona un departamento para ver detalles."));
-        return box;
+        Label l = new Label("Selecciona un departamento para ver detalles.");
+        l.setTextFill(Color.web("#4A148C"));
+        l.setFont(Font.font("Segoe UI", 15));
+        VBox v = new VBox(l);
+        v.setAlignment(Pos.CENTER);
+        return v;
     }
 
     private void construirGrid() {
         gridDeptos.getChildren().clear();
         if (sucursalActual == null) return;
-
         List<Departamento> dptos = sucursalActual.getDepartamentos();
         int cols = 4;
         for (int i = 0; i < dptos.size(); i++) {
             Departamento d = dptos.get(i);
-            Button btn = new Button(String.valueOf(d.getNumero()));
-            btn.setMaxWidth(Double.MAX_VALUE);
-            btn.setMinSize(80, 60);
-
-            String color = d.isOcupado() ? "-fx-background-color:#ffb3b3;" : "-fx-background-color:#b3ffb3;";
-            btn.setStyle(color + "-fx-font-size:16px;-fx-font-weight:bold;");
+            Button btn = new Button("Depto " + d.getNumero());
+            btn.setPrefSize(150, 100);
+            btn.setWrapText(true);
+            btn.setFont(Font.font("Segoe UI Semibold", 15));
+            String color = d.isOcupado()
+                    ? "-fx-background-color:#B39DDB;"
+                    : "-fx-background-color:#D1C4E9;";
+            btn.setStyle(color + "-fx-text-fill:#4A148C;-fx-background-radius:12;"
+                    + "-fx-font-weight:600;-fx-cursor:hand;");
             btn.setOnAction(e -> {
                 dptoSeleccionado = d;
                 renderDetalle(d);
             });
-
             int row = i / cols, col = i % cols;
             gridDeptos.add(btn, col, row);
-            GridPane.setHgrow(btn, Priority.ALWAYS);
-            GridPane.setVgrow(btn, Priority.ALWAYS);
         }
     }
 
     private void renderDetalle(Departamento d) {
         panelDetalle.getChildren().clear();
-        Label titulo = new Label("Departamento #" + d.getNumero());
-        titulo.setFont(Font.font(16));
 
-        VBox contenido = new VBox(6);
-        contenido.setPadding(new Insets(6));
-        contenido.setStyle("-fx-background-color:#f5f5f5;-fx-padding:10;-fx-background-radius:8;");
+        Label titulo = new Label("Departamento #" + d.getNumero());
+        titulo.setFont(Font.font("Segoe UI Semibold", 22));
+        titulo.setTextFill(Color.web("#4A148C"));
+
+        VBox box = new VBox(12);
+        box.setPadding(new Insets(15));
+        box.setStyle("-fx-background-color:#F8F6FF;-fx-background-radius:15;"
+                + "-fx-effect:dropshadow(gaussian,rgba(0,0,0,0.1),8,0,0,2);");
 
         if (d.isOcupado() && d.getContrato() != null) {
             Contrato c = d.getContrato();
-            Inquilino inq = c.getInquilino();
+            Inquilino i = c.getInquilino();
 
-            Label l1 = new Label("Estado: OCUPADO");
-            Label l2 = new Label("Arrendado desde: " + c.getFechaInicio());
-            LocalDate proxCobro = service.calcularProximaFechaCobro(c);
-            Label l3 = new Label("Próximo cobro: " + proxCobro + " (día corte: " + c.getDiaCorte() + ")");
-            Label l4 = new Label("Mensualidad: $" + c.getMensualidad());
-            Label l5 = new Label("Personas: " + c.getNumeroPersonas());
-            Label l6 = new Label("Inquilino: " + inq.getNombres() + " " + inq.getApellidos());
-            Label l7 = new Label("Cédula: " + inq.getCedula() + " | Tel: " + inq.getTelefono());
-            Label l8 = new Label("Deuda arriendo: $" + c.getDeudaArriendo());
-            Label l9 = new Label("Deuda garantía: $" + c.getDeudaGarantia());
+            Label[] info = {
+                new Label("Inquilino: " + i.getNombres() + " " + i.getApellidos()),
+                new Label("Cédula: " + i.getCedula() + " | Teléfono: " + i.getTelefono()),
+                new Label("Arrendado desde: " + c.getFechaInicio()),
+                new Label("Día de corte: " + c.getDiaCorte()),
+                new Label("Próximo cobro: " + service.calcularProximaFechaCobro(c)),
+                new Label("Personas en departamento: " + c.getNumeroPersonas()),
+                new Label("Mensualidad: " + formatoMoneda.format(c.getMensualidad())),
+                new Label("Garantía pactada: " + formatoMoneda.format(c.getDeposito())),
+                new Label("Deuda arriendo: " + formatoMoneda.format(c.getDeudaArriendo())),
+                new Label("Deuda garantía: " + formatoMoneda.format(c.getDeudaGarantia()))
+            };
+            for (Label l : info) {
+                l.setTextFill(Color.web("#4A148C"));
+                l.setFont(Font.font("Segoe UI", 14));
+            }
 
-            HBox nav = new HBox(8);
-            Button prev = new Button("Anterior"), next = new Button("Siguiente");
-            prev.setOnAction(e -> seleccionarAnterior());
-            next.setOnAction(e -> seleccionarSiguiente());
-            nav.getChildren().addAll(prev, next);
+            FlowPane botones = new FlowPane(15, 15);
+            botones.setAlignment(Pos.CENTER);
+            botones.getChildren().addAll(
+                    botonMorado("Editar precio", e -> editarPrecio(c, d)),
+                    botonMorado("Editar garantía", e -> editarGarantia(c, d)),
+                    botonMorado("Pago arriendo", e -> pagoArriendo(c, d)),
+                    botonMorado("Pago garantía", e -> pagoGarantia(c, d)),
+                    botonMorado("Desocupar", e -> { d.desocupar(); construirGrid(); panelDetalle.getChildren().setAll(crearPanelPlaceholder()); })
+            );
 
-            HBox acciones = new HBox(8);
-            Button desoc = new Button("Desocupar");
-            Button pago = new Button("Registrar pago");
-            Button editar = new Button("Editar inquilino");
-            desoc.setOnAction(e -> { d.desocupar(); construirGrid(); renderDetalle(d); });
-            pago.setOnAction(e -> {
-                TextInputDialog dialog = new TextInputDialog("50.00");
-                dialog.setHeaderText("Monto a registrar (arriendo)");
-                dialog.setContentText("USD:");
-                dialog.showAndWait().ifPresent(val -> {
-                    try {
-                        c.registrarPagoArriendo(new BigDecimal(val));
-                        renderDetalle(d);
-                    } catch (Exception ex) { mostrarError("Monto inválido"); }
-                });
-            });
-            editar.setOnAction(e -> editarInquilino(c));
-            acciones.getChildren().addAll(desoc, pago, editar);
-
-            contenido.getChildren().addAll(l1,l2,l3,l4,l5,l6,l7,l8,l9,new Separator(),nav,acciones);
+            box.getChildren().addAll(info);
+            box.getChildren().add(new Separator());
+            box.getChildren().add(botones);
         } else {
-            Label l1 = new Label("Estado: DESOCUPADO");
-            Label l2 = new Label("Precio base: $" + d.getPrecioBase());
-
-            HBox nav = new HBox(8);
-            Button prev = new Button("Anterior"), next = new Button("Siguiente");
-            prev.setOnAction(e -> seleccionarAnterior());
-            next.setOnAction(e -> seleccionarSiguiente());
-            nav.getChildren().addAll(prev, next);
-
-            HBox acciones = new HBox(8);
-            Button arrendar = new Button("Arrendar");
-            arrendar.setOnAction(e -> arrendarDialog(d));
-            acciones.getChildren().add(arrendar);
-
-            contenido.getChildren().addAll(l1,l2,new Separator(),nav,acciones);
+            Label l1 = new Label("Estado: Vacío");
+            l1.setTextFill(Color.web("#4A148C"));
+            l1.setFont(Font.font("Segoe UI", 14));
+            Label l2 = new Label("Precio base: " + formatoMoneda.format(d.getPrecioBase()));
+            l2.setTextFill(Color.web("#4A148C"));
+            Button arrendar = botonMorado("Arrendar departamento", e -> arrendarDialog(d));
+            VBox vacioBox = new VBox(10, l1, l2, arrendar);
+            vacioBox.setAlignment(Pos.CENTER);
+            box.getChildren().add(vacioBox);
         }
 
-        panelDetalle.getChildren().addAll(titulo, contenido);
+        panelDetalle.getChildren().addAll(titulo, box);
     }
 
-    private void seleccionarAnterior() {
-        if (sucursalActual == null || dptoSeleccionado == null) return;
-        List<Departamento> list = sucursalActual.getDepartamentos();
-        int i = list.indexOf(dptoSeleccionado);
-        if (i > 0) { dptoSeleccionado = list.get(i - 1); renderDetalle(dptoSeleccionado); }
+    private Button botonMorado(String texto, javafx.event.EventHandler<javafx.event.ActionEvent> accion) {
+        Button b = new Button(texto);
+        b.setStyle("-fx-background-color:#9575cd;-fx-text-fill:white;"
+                + "-fx-background-radius:12;-fx-font-size:14px;-fx-cursor:hand;"
+                + "-fx-padding:8 16;-fx-font-weight:600;");
+        b.setOnAction(accion);
+        return b;
     }
 
-    private void seleccionarSiguiente() {
-        if (sucursalActual == null || dptoSeleccionado == null) return;
-        List<Departamento> list = sucursalActual.getDepartamentos();
-        int i = list.indexOf(dptoSeleccionado);
-        if (i < list.size() - 1) { dptoSeleccionado = list.get(i + 1); renderDetalle(dptoSeleccionado); }
+    private void editarPrecio(Contrato c, Departamento d) {
+        TextInputDialog t = new TextInputDialog(c.getMensualidad().toPlainString());
+        t.setHeaderText("Nuevo precio mensual");
+        t.showAndWait().ifPresent(v -> {
+            try { c.setMensualidad(new BigDecimal(v)); renderDetalle(d); }
+            catch (Exception ex) { mostrarError("Valor inválido"); }
+        });
+    }
+
+    private void editarGarantia(Contrato c, Departamento d) {
+        TextInputDialog t = new TextInputDialog(c.getDeposito().toPlainString());
+        t.setHeaderText("Monto de garantía (pagada o a pagar)");
+        t.showAndWait().ifPresent(v -> {
+            try { c.setDeposito(new BigDecimal(v)); renderDetalle(d); }
+            catch (Exception ex) { mostrarError("Valor inválido"); }
+        });
+    }
+
+    private void pagoArriendo(Contrato c, Departamento d) {
+        TextInputDialog t = new TextInputDialog("0");
+        t.setHeaderText("Registrar pago de arriendo");
+        t.showAndWait().ifPresent(v -> {
+            try { c.registrarPagoArriendo(new BigDecimal(v)); renderDetalle(d); }
+            catch (Exception ex) { mostrarError("Monto inválido"); }
+        });
+    }
+
+    private void pagoGarantia(Contrato c, Departamento d) {
+        TextInputDialog t = new TextInputDialog("0");
+        t.setHeaderText("Registrar pago de garantía");
+        t.showAndWait().ifPresent(v -> {
+            try { c.registrarPagoGarantia(new BigDecimal(v)); renderDetalle(d); }
+            catch (Exception ex) { mostrarError("Monto inválido"); }
+        });
     }
 
     private void arrendarDialog(Departamento d) {
         Dialog<Contrato> dialog = new Dialog<>();
-        dialog.setTitle("Nuevo Contrato");
-
+        dialog.setTitle("Nuevo Arriendo");
         GridPane gp = new GridPane();
-        gp.setHgap(8); gp.setVgap(8); gp.setPadding(new Insets(10));
+        gp.setHgap(10); gp.setVgap(10); gp.setPadding(new Insets(15));
 
-        TextField nom = new TextField(), ape = new TextField(),
-                ced = new TextField(), tel = new TextField(),
-                dia = new TextField("5"), men = new TextField(d.getPrecioBase().toPlainString()),
-                dep = new TextField("0"), per = new TextField("1");
-        DatePicker ini = new DatePicker(LocalDate.now());
+        TextField tfNom = new TextField();
+        TextField tfApe = new TextField();
+        TextField tfCed = new TextField();
+        TextField tfTel = new TextField();
+        DatePicker dpInicio = new DatePicker(LocalDate.now());
+        TextField tfDiaCorte = new TextField("5");
+        TextField tfMens = new TextField(d.getPrecioBase().toPlainString());
+        TextField tfDep = new TextField("0");
+        TextField tfPersonas = new TextField("1");
 
-        gp.addRow(0, new Label("Nombres:"), nom);
-        gp.addRow(1, new Label("Apellidos:"), ape);
-        gp.addRow(2, new Label("Cédula:"), ced);
-        gp.addRow(3, new Label("Teléfono:"), tel);
-        gp.addRow(4, new Label("Inicio:"), ini);
-        gp.addRow(5, new Label("Día corte:"), dia);
-        gp.addRow(6, new Label("Mensualidad:"), men);
-        gp.addRow(7, new Label("Depósito:"), dep);
-        gp.addRow(8, new Label("# Personas:"), per);
+        gp.addRow(0, new Label("Nombres:"), tfNom);
+        gp.addRow(1, new Label("Apellidos:"), tfApe);
+        gp.addRow(2, new Label("Cédula:"), tfCed);
+        gp.addRow(3, new Label("Teléfono:"), tfTel);
+        gp.addRow(4, new Label("Inicio:"), dpInicio);
+        gp.addRow(5, new Label("Día corte:"), tfDiaCorte);
+        gp.addRow(6, new Label("Mensualidad ($):"), tfMens);
+        gp.addRow(7, new Label("Garantía ($):"), tfDep);
+        gp.addRow(8, new Label("# Personas:"), tfPersonas);
 
         dialog.getDialogPane().setContent(gp);
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+
         dialog.setResultConverter(bt -> {
-            if (bt == ButtonType.OK) try {
-                Inquilino inq = new Inquilino(nom.getText(), ape.getText(), ced.getText(), tel.getText());
-                return new Contrato(inq, ini.getValue(),
-                        Integer.parseInt(dia.getText()),
-                        new BigDecimal(men.getText()),
-                        new BigDecimal(dep.getText()),
-                        Integer.parseInt(per.getText()));
-            } catch (Exception e) { mostrarError("Datos inválidos: " + e.getMessage()); }
+            if (bt == ButtonType.OK) {
+                try {
+                    Inquilino inq = new Inquilino(tfNom.getText(), tfApe.getText(), tfCed.getText(), tfTel.getText());
+                    int diaCorte = Integer.parseInt(tfDiaCorte.getText());
+                    BigDecimal mensualidad = new BigDecimal(tfMens.getText());
+                    BigDecimal deposito = new BigDecimal(tfDep.getText());
+                    int personas = Integer.parseInt(tfPersonas.getText());
+                    return new Contrato(inq, dpInicio.getValue(), diaCorte, mensualidad, deposito, personas);
+                } catch (Exception ex) { mostrarError("Datos inválidos"); }
+            }
             return null;
         });
 
         dialog.showAndWait().ifPresent(c -> { d.ocupar(c); construirGrid(); renderDetalle(d); });
     }
 
-    private void editarInquilino(Contrato c) {
-        Dialog<Inquilino> dialog = new Dialog<>();
-        dialog.setTitle("Editar Inquilino");
-        GridPane gp = new GridPane();
-        gp.setHgap(8); gp.setVgap(8); gp.setPadding(new Insets(10));
-
-        TextField nom = new TextField(c.getInquilino().getNombres());
-        TextField ape = new TextField(c.getInquilino().getApellidos());
-        TextField ced = new TextField(c.getInquilino().getCedula());
-        TextField tel = new TextField(c.getInquilino().getTelefono());
-
-        gp.addRow(0, new Label("Nombres:"), nom);
-        gp.addRow(1, new Label("Apellidos:"), ape);
-        gp.addRow(2, new Label("Cédula:"), ced);
-        gp.addRow(3, new Label("Teléfono:"), tel);
-
-        dialog.getDialogPane().setContent(gp);
-        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
-        dialog.setResultConverter(bt -> bt == ButtonType.OK ?
-                new Inquilino(nom.getText(), ape.getText(), ced.getText(), tel.getText()) : null);
-        dialog.showAndWait().ifPresent(n -> { c.setInquilino(n); renderDetalle(dptoSeleccionado); });
-    }
-
     private void mostrarError(String msg) {
         new Alert(Alert.AlertType.ERROR, msg, ButtonType.OK).showAndWait();
     }
 
-    public static void main(String[] args) {
-        launch();
-    }
+    public static void main(String[] args) { launch(); }
 }
